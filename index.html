@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Agro AI</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f8fb; color: #1f2937; }
+    .container { max-width: 720px; margin: 2rem auto; padding: 2rem; background: white; border-radius: 18px; box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08); }
+    h1 { margin-top: 0; color: #2f855a; }
+    label { display: block; margin: 0.9rem 0 0.25rem; }
+    input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e0; border-radius: 10px; }
+    button { margin-top: 1rem; width: 100%; padding: 0.95rem; background: #2f855a; color: white; border: none; cursor: pointer; border-radius: 10px; font-weight: 600; }
+    button:hover { background: #276749; }
+    .result { margin-top: 1.5rem; padding: 1rem; background: #edf7ed; border-left: 4px solid #2f855a; }
+    .note { margin-top: 1rem; font-size: 0.95rem; color: #4a5568; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Smart Agro AI</h1>
+    <p>Enter soil and weather parameters to get a crop recommendation.</p>
+    <form id="predict-form">
+      <label for="N">Nitrogen (N)</label>
+      <input id="N" name="N" type="number" step="0.1" value="90" required />
+      <label for="P">Phosphorus (P)</label>
+      <input id="P" name="P" type="number" step="0.1" value="42" required />
+      <label for="K">Potassium (K)</label>
+      <input id="K" name="K" type="number" step="0.1" value="43" required />
+      <label for="temperature">Temperature (°C)</label>
+      <input id="temperature" name="temperature" type="number" step="0.1" value="25" required />
+      <label for="humidity">Humidity (%)</label>
+      <input id="humidity" name="humidity" type="number" step="0.1" value="80" required />
+      <label for="ph">Soil pH</label>
+      <input id="ph" name="ph" type="number" step="0.1" value="6.5" required />
+      <label for="rainfall">Rainfall (mm)</label>
+      <input id="rainfall" name="rainfall" type="number" step="0.1" value="200" required />
+      <button type="submit">Predict Crop</button>
+    </form>
+    <div class="result" id="result" style="display:none"></div>
+    <p class="note">This app uses Vercel serverless API. The endpoint is <code>/api/predict</code>.</p>
+  </div>
+  <script>
+    document.getElementById('predict-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = {
+        N: parseFloat(document.getElementById('N').value),
+        P: parseFloat(document.getElementById('P').value),
+        K: parseFloat(document.getElementById('K').value),
+        temperature: parseFloat(document.getElementById('temperature').value),
+        humidity: parseFloat(document.getElementById('humidity').value),
+        ph: parseFloat(document.getElementById('ph').value),
+        rainfall: parseFloat(document.getElementById('rainfall').value),
+      };
+
+      const response = await fetch('/api/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const resultBox = document.getElementById('result');
+      if (!response.ok) {
+        const error = await response.text();
+        resultBox.style.display = 'block';
+        resultBox.innerHTML = `<strong>Error:</strong> ${error}`;
+        return;
+      }
+
+      const json = await response.json();
+      const probabilityRows = Object.entries(json.probabilities)
+        .sort((a,b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([crop, prob]) => `<li>${crop}: ${prob.toFixed(2)}</li>`)
+        .join('');
+
+      resultBox.style.display = 'block';
+      resultBox.innerHTML = `
+        <strong>Recommended crop:</strong> ${json.prediction}
+        <p><strong>Top 3 probabilities:</strong></p>
+        <ul>${probabilityRows}</ul>
+      `;
+    });
+  </script>
+</body>
+</html>
