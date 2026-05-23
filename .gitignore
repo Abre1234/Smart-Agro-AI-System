@@ -20,3 +20,4 @@ env/
 # Vercel deployment metadata
 .vercel/
 .vercel
+.env*
