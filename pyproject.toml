@@ -2,3 +2,6 @@
 name = "smart-agro-ai"
 version = "2.1.0"
 requires-python = ">=3.11,<3.13"
+
+[tool.vercel]
+entrypoint = "app:app"

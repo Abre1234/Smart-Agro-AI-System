@@ -77,12 +77,12 @@ artifact_names = [
     ("feature_names.joblib", X.columns.tolist()),
 ]
 
-for folder in ("artifacts", "api/artifacts"):
+for folder in ("artifacts",):
     os.makedirs(folder, exist_ok=True)
     for name, obj in artifact_names:
         joblib.dump(obj, f"{folder}/{name}")
 
-print("   [ok] saved to artifacts/ and api/artifacts/")
+print("   [ok] saved to artifacts/")
 print("\n" + "=" * 60)
 print("TRAINING COMPLETE")
 print("=" * 60)
