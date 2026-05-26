@@ -673,6 +673,7 @@
         <span class="tech-badge">LightGBM</span>
         <span class="tech-badge">Scikit-learn</span>
         <span class="tech-badge">FastAPI</span>
+        <span class="tech-badge">GitHub</span>
         <span class="tech-badge">Vercel</span>
       </div>
       <p style="margin-top: 1.5rem; opacity: 0.7;">
@@ -753,11 +754,16 @@
           body: JSON.stringify(data),
         });
 
+        const json = await response.json();
+
         if (!response.ok) {
-          throw new Error(await response.text());
+          const detail = json.detail || json.message || JSON.stringify(json);
+          throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
         }
 
-        const json = await response.json();
+        if (json.error) {
+          throw new Error(json.error);
+        }
         
         // Update crop name
         document.getElementById('crop-name').textContent = json.prediction;

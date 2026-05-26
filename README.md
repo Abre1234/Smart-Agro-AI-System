@@ -1,66 +1,67 @@
-# Smart Agro AI System
+# Smart Agro AI — Crop Recommendation System
 
-A minimal farmer-facing crop recommendation project with Vercel-ready deployment.
+AI-powered crop recommendation from soil and weather inputs. Deploy the live demo by connecting this GitHub repo to [Vercel](https://vercel.com).
 
-## ✅ What this repo contains
-- `index.html` — simple static UI for inputting soil/weather values
-- `api/predict.py` — FastAPI serverless endpoint for crop prediction
-- `train.py` — train the model from scratch and save artifacts
-- `data/` — dataset files used for training
-- `artifacts/` — trained model and label encoder
-- `vercel.json` — Vercel serverless deployment config
+## Live demo (deploy via GitHub)
 
-## 🚀 Local setup
-1. Install dependencies:
+1. **Push this repo to GitHub** (include the `artifacts/` folder — required for predictions).
+2. Go to [vercel.com/new](https://vercel.com/new) and **Import** your GitHub repository.
+3. Use these settings (Vercel usually auto-detects them):
+   - **Framework Preset:** Other (or FastAPI)
+   - **Root Directory:** `.` (repo root)
+   - **Build Command:** leave empty
+   - **Output Directory:** leave empty
+4. Click **Deploy**. Your live URL will look like: `https://your-project-name.vercel.app`
+5. Open the URL — the UI is at `/` and the API at `/api/predict`.
+
+> **Important:** Commit `artifacts/model.joblib`, `artifacts/scaler.joblib`, `artifacts/label_encoder.joblib`, and `artifacts/feature_names.joblib` before deploying. Without them, predictions will fail.
+
+## Project structure
+
+```
+Crop_Recommendation_System/
+├── app.py                 # FastAPI app (Vercel entrypoint)
+├── public/index.html      # Web UI (served at /)
+├── artifacts/             # Trained model files (commit these)
+├── train.py               # Train model from data/
+├── data/                  # Training CSV files
+├── requirements.txt       # Production dependencies
+├── vercel.json            # Vercel function settings
+└── README.md
+```
+
+## Local development
+
 ```bash
 python -m pip install -r requirements.txt
+python train.py
+python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
 ```
-2. Train the model:
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) for the UI and [http://127.0.0.1:8000/api/predict](http://127.0.0.1:8000/api/predict) for the API.
+
+### Sample API request
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/predict \
+  -H "Content-Type: application/json" \
+  -d "{\"N\":90,\"P\":42,\"K\":43,\"temperature\":20.8,\"humidity\":82,\"ph\":6.5,\"rainfall\":202.9}"
+```
+
+## Retrain the model
+
 ```bash
 python train.py
 ```
-3. Run locally for development:
-```bash
-uvicorn api.predict:app --reload --host localhost --port 8000
-```
-4. Open `index.html` in a browser or use Vercel flow.
 
-## 📦 Vercel deployment
-1. Install Vercel CLI if not already installed:
-```bash
-npm install -g vercel
-```
-2. Deploy from the repo root:
-```bash
-vercel --prod
-```
+This writes updated files to `artifacts/`. Commit and push to redeploy on Vercel.
 
-## 🧠 Training flow
-- Loads `data/Crop_recommendation.csv`
-- Encodes crop labels
-- Trains a Random Forest classifier
-- Saves:
-  - `artifacts/model.joblib`
-  - `artifacts/label_encoder.joblib`
+## Tech stack
 
-## 📁 Project structure
+- **ML:** XGBoost, scikit-learn, engineered NPK/weather features
+- **API:** FastAPI
+- **Hosting:** Vercel (connected to GitHub)
 
-```
-Smart Agro AI System/
-│
-├── api/                          # Vercel serverless prediction endpoint
-│   └── predict.py
-├── artifacts/                    # Saved model artifacts
-│   ├── label_encoder.joblib
-│   └── model.joblib
-├── data/                         # Training data
-│   ├── Crop_recommendation.csv
-│   └── Crop_Desc.csv
-├── index.html                    # Static presentation UI
-├── notebooks/                    # Optional analysis notebooks
-│   └── models.ipynb
-├── train.py                      # Train ML model from scratch
-├── requirements.txt              # Python dependencies
-├── vercel.json                   # Vercel deployment config
-└── README.md                     # Project documentation
-```
+## License
+
+See [LICENSE](LICENSE).

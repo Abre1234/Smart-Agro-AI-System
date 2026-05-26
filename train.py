@@ -1,71 +1,150 @@
+"""
+Training script for Smart Agro AI Crop Recommendation Model
+Generates model artifacts for deployment
+"""
+
+import numpy as np
 import pandas as pd
 import joblib
-from pathlib import Path
-from sklearn.ensemble import RandomForestClassifier
+import os
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, f1_score
 
-DATA_PATH = Path("data") / "Crop_recommendation.csv"
-ARTIFACTS_DIR = Path("artifacts")
-MODEL_PATH = ARTIFACTS_DIR / "model.joblib"
-ENCODER_PATH = ARTIFACTS_DIR / "label_encoder.joblib"
+print("=" * 60)
+print("SMART AGRO AI - MODEL TRAINING")
+print("=" * 60)
 
+# Load data
+print("\n1. Loading data...")
+df = pd.read_csv("data/Crop_recommendation.csv")
+print(f"   Dataset loaded: {df.shape[0]} samples, {df.shape[1]} features")
 
-def load_data(path=DATA_PATH):
-    df = pd.read_csv(path)
-    X = df.drop(columns=["label"])
-    y = df["label"]
-    return X, y
+# Feature Engineering
+print("\n2. Creating enhanced features...")
+df_enhanced = df.copy()
 
+# NPK ratio features
+df_enhanced['NPK_sum'] = df_enhanced['N'] + df_enhanced['P'] + df_enhanced['K']
+df_enhanced['NP_ratio'] = df_enhanced['N'] / (df_enhanced['P'] + 1)
+df_enhanced['NK_ratio'] = df_enhanced['N'] / (df_enhanced['K'] + 1)
+df_enhanced['PK_ratio'] = df_enhanced['P'] / (df_enhanced['K'] + 1)
 
-def train_model(X, y):
-    encoder = LabelEncoder()
-    y_encoded = encoder.fit_transform(y)
+# Environmental interaction features
+df_enhanced['temp_humidity_interaction'] = df_enhanced['temperature'] * df_enhanced['humidity']
+df_enhanced['temp_rainfall_interaction'] = df_enhanced['temperature'] * df_enhanced['rainfall']
+df_enhanced['humidity_rainfall_interaction'] = df_enhanced['humidity'] * df_enhanced['rainfall']
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
-    )
+print(f"   Enhanced features created: {df_enhanced.shape[1]} total features")
 
-    model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=15,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        random_state=42,
-        class_weight="balanced",
-        n_jobs=-1,
-    )
-    model.fit(X_train, y_train)
+# Prepare data
+print("\n3. Preparing data...")
+X = df_enhanced.drop(['label'], axis=1)
+y = df_enhanced['label']
 
-    y_pred = model.predict(X_test)
-    metrics = {
-        "accuracy": accuracy_score(y_test, y_pred),
-        "precision": precision_score(y_test, y_pred, average="weighted", zero_division=0),
-        "recall": recall_score(y_test, y_pred, average="weighted", zero_division=0),
-        "f1": f1_score(y_test, y_pred, average="weighted", zero_division=0),
-        "n_classes": len(encoder.classes_),
-        "n_features": X.shape[1],
-        "n_samples": len(X),
-    }
+# Encode labels
+le = LabelEncoder()
+y_encoded = le.fit_transform(y)
+print(f"   Number of crop classes: {len(le.classes_)}")
 
-    return model, encoder, metrics
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+)
+print(f"   Training set: {X_train.shape[0]} samples")
+print(f"   Test set: {X_test.shape[0]} samples")
 
+# Scale features
+print("\n4. Scaling features...")
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+print("   Features scaled successfully")
 
-def save_artifacts(model, encoder):
-    ARTIFACTS_DIR.mkdir(exist_ok=True)
-    joblib.dump(model, MODEL_PATH)
-    joblib.dump(encoder, ENCODER_PATH)
-    print(f"Saved model to: {MODEL_PATH}")
-    print(f"Saved encoder to: {ENCODER_PATH}")
+# Train model
+print("\n5. Training XGBoost model...")
+model = XGBClassifier(
+    n_estimators=200,
+    max_depth=8,
+    learning_rate=0.1,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_weight=3,
+    gamma=0.1,
+    reg_alpha=0.1,
+    reg_lambda=1.0,
+    random_state=42,
+    n_jobs=-1,
+    eval_metric='mlogloss'
+)
 
+model.fit(X_train_scaled, y_train)
+print("   Model training completed")
 
-if __name__ == "__main__":
-    X, y = load_data()
-    model, encoder, metrics = train_model(X, y)
-    save_artifacts(model, encoder)
+# Evaluate model
+print("\n6. Evaluating model...")
+y_train_pred = model.predict(X_train_scaled)
+y_test_pred = model.predict(X_test_scaled)
 
-    print("\nTraining complete")
-    print("Metrics:")
-    for key, value in metrics.items():
-        print(f"- {key}: {value:.4f}" if isinstance(value, float) else f"- {key}: {value}")
+train_acc = accuracy_score(y_train, y_train_pred)
+test_acc = accuracy_score(y_test, y_test_pred)
+test_f1 = f1_score(y_test, y_test_pred, average='weighted')
+
+print(f"   Train Accuracy: {train_acc:.4f} ({train_acc*100:.2f}%)")
+print(f"   Test Accuracy:  {test_acc:.4f} ({test_acc*100:.2f}%)")
+print(f"   Test F1-Score:  {test_f1:.4f}")
+
+# Save artifacts
+print("\n7. Saving model artifacts...")
+os.makedirs('artifacts', exist_ok=True)
+
+joblib.dump(model, 'artifacts/model.joblib')
+joblib.dump(scaler, 'artifacts/scaler.joblib')
+joblib.dump(le, 'artifacts/label_encoder.joblib')
+joblib.dump(X.columns.tolist(), 'artifacts/feature_names.joblib')
+
+print("   [ok] model.joblib")
+print("   [ok] scaler.joblib")
+print("   [ok] label_encoder.joblib")
+print("   [ok] feature_names.joblib")
+
+# Test prediction
+print("\n8. Testing prediction...")
+sample_data = pd.DataFrame({
+    'N': [90],
+    'P': [42],
+    'K': [43],
+    'temperature': [20.8],
+    'humidity': [82.0],
+    'ph': [6.5],
+    'rainfall': [202.9]
+})
+
+# Add enhanced features
+sample_enhanced = sample_data.copy()
+sample_enhanced['NPK_sum'] = sample_enhanced['N'] + sample_enhanced['P'] + sample_enhanced['K']
+sample_enhanced['NP_ratio'] = sample_enhanced['N'] / (sample_enhanced['P'] + 1)
+sample_enhanced['NK_ratio'] = sample_enhanced['N'] / (sample_enhanced['K'] + 1)
+sample_enhanced['PK_ratio'] = sample_enhanced['P'] / (sample_enhanced['K'] + 1)
+sample_enhanced['temp_humidity_interaction'] = sample_enhanced['temperature'] * sample_enhanced['humidity']
+sample_enhanced['temp_rainfall_interaction'] = sample_enhanced['temperature'] * sample_enhanced['rainfall']
+sample_enhanced['humidity_rainfall_interaction'] = sample_enhanced['humidity'] * sample_enhanced['rainfall']
+
+sample_scaled = scaler.transform(sample_enhanced)
+prediction = model.predict(sample_scaled)[0]
+crop_name = le.inverse_transform([prediction])[0]
+probabilities = model.predict_proba(sample_scaled)[0]
+
+print(f"   Sample input: N=90, P=42, K=43, Temp=20.8°C")
+print(f"   Predicted crop: {crop_name}")
+print(f"   Confidence: {probabilities[prediction]*100:.2f}%")
+
+print("\n" + "=" * 60)
+print("MODEL TRAINING COMPLETED SUCCESSFULLY!")
+print("=" * 60)
+print("\nYou can now:")
+print("1. Run the API: python -m uvicorn api.predict:app --reload")
+print("2. Test locally: http://localhost:8000")
+print("3. Deploy to Vercel")
+print("=" * 60)
