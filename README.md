@@ -26,7 +26,6 @@ Crop_Recommendation_System/
 ├── train.py               # Train model from data/
 ├── data/                  # Training CSV files
 ├── requirements.txt       # Production dependencies
-├── vercel.json            # Vercel function settings
 └── README.md
 ```
 
