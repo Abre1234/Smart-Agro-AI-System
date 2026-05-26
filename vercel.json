@@ -3,7 +3,6 @@
   "functions": {
     "api/**/*.py": {
       "maxDuration": 30,
-      "includeFiles": "artifacts/**,api/artifacts/**",
       "excludeFiles": "{notebooks/**,data/**,**/*.ipynb,models_script.py,train.py,requirements-dev.txt}"
     }
   }

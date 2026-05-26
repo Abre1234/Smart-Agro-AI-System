@@ -1,7 +1,4 @@
 [project]
 name = "smart-agro-ai"
-version = "2.0.0"
-requires-python = ">=3.11"
-
-[tool.vercel]
-entrypoint = "api.index:app"
+version = "2.1.0"
+requires-python = ">=3.11,<3.13"
