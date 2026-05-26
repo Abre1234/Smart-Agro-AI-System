@@ -1,6 +1,6 @@
 """FastAPI app for crop recommendation (local + Vercel via GitHub)."""
 
-from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 
 import joblib
@@ -10,13 +10,31 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-BASE_DIR = Path(__file__).resolve().parent
-ARTIFACTS_DIR = BASE_DIR / "artifacts"
-
 _model = None
 _encoder = None
 _scaler = None
 _feature_names = None
+
+
+def _resolve_artifacts_dir() -> Path:
+    """Find artifacts on local disk or Vercel serverless (/var/task)."""
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here / "artifacts",
+        here / "api" / "artifacts",
+        here.parent / "artifacts",
+        Path("/var/task") / "artifacts",
+        Path("/var/task") / "api" / "artifacts",
+        Path(os.environ.get("LAMBDA_TASK_ROOT", "")) / "artifacts",
+        Path(os.environ.get("LAMBDA_TASK_ROOT", "")) / "api" / "artifacts",
+    ]
+    for path in candidates:
+        if path and (path / "model.joblib").exists():
+            return path
+    return here / "artifacts"
+
+
+ARTIFACTS_DIR = _resolve_artifacts_dir()
 
 
 class PredictRequest(BaseModel):
@@ -53,15 +71,17 @@ def load_artifacts():
     if _model is not None:
         return
 
-    model_path = ARTIFACTS_DIR / "model.joblib"
-    encoder_path = ARTIFACTS_DIR / "label_encoder.joblib"
-    scaler_path = ARTIFACTS_DIR / "scaler.joblib"
-    feature_names_path = ARTIFACTS_DIR / "feature_names.joblib"
+    artifacts_dir = _resolve_artifacts_dir()
+    model_path = artifacts_dir / "model.joblib"
+    encoder_path = artifacts_dir / "label_encoder.joblib"
+    scaler_path = artifacts_dir / "scaler.joblib"
+    feature_names_path = artifacts_dir / "feature_names.joblib"
 
     missing = [p.name for p in (model_path, encoder_path) if not p.exists()]
     if missing:
         raise FileNotFoundError(
-            f"Missing artifacts: {', '.join(missing)}. Run: python train.py"
+            f"Missing artifacts in {artifacts_dir}: {', '.join(missing)}. "
+            "Run: python train.py"
         )
 
     _model = joblib.load(model_path)
@@ -72,17 +92,7 @@ def load_artifacts():
     )
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    load_artifacts()
-    yield
-
-
-app = FastAPI(
-    title="Smart Agro AI API",
-    version="2.0",
-    lifespan=lifespan,
-)
+app = FastAPI(title="Smart Agro AI API", version="2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -134,7 +144,13 @@ def run_prediction(request: PredictRequest) -> dict:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "Smart Agro AI"}
+    artifacts_dir = _resolve_artifacts_dir()
+    return {
+        "status": "ok",
+        "service": "Smart Agro AI",
+        "artifacts_dir": str(artifacts_dir),
+        "model_exists": (artifacts_dir / "model.joblib").exists(),
+    }
 
 
 @app.get("/api")
@@ -166,9 +182,7 @@ def predict(request: PredictRequest):
 
 
 # Serve UI when running locally (Vercel serves public/ via CDN)
-import os
-
-_PUBLIC_DIR = BASE_DIR / "public"
+_PUBLIC_DIR = Path(__file__).resolve().parent / "public"
 if _PUBLIC_DIR.exists() and not os.environ.get("VERCEL"):
     from fastapi.staticfiles import StaticFiles
 

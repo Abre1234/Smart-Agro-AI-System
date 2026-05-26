@@ -99,15 +99,23 @@ print(f"   Test F1-Score:  {test_f1:.4f}")
 print("\n7. Saving model artifacts...")
 os.makedirs('artifacts', exist_ok=True)
 
-joblib.dump(model, 'artifacts/model.joblib')
-joblib.dump(scaler, 'artifacts/scaler.joblib')
-joblib.dump(le, 'artifacts/label_encoder.joblib')
-joblib.dump(X.columns.tolist(), 'artifacts/feature_names.joblib')
+artifact_names = [
+    ("model.joblib", model),
+    ("scaler.joblib", scaler),
+    ("label_encoder.joblib", le),
+    ("feature_names.joblib", X.columns.tolist()),
+]
+
+for folder in ("artifacts", "api/artifacts"):
+    os.makedirs(folder, exist_ok=True)
+    for name, obj in artifact_names:
+        joblib.dump(obj, f"{folder}/{name}")
 
 print("   [ok] model.joblib")
 print("   [ok] scaler.joblib")
 print("   [ok] label_encoder.joblib")
 print("   [ok] feature_names.joblib")
+print("   [ok] copied to api/artifacts for Vercel")
 
 # Test prediction
 print("\n8. Testing prediction...")
